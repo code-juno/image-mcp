@@ -55,9 +55,9 @@ matching the context schema) and repeat — it should now appear in the list.
 
 **Expected:**
 - Claude calls `generate_image` with just `prompt`.
-- A file named like `2026-03-27_14-05-30_default.png` is saved in the **current working directory** (wherever Claude Code is running from).
+- A file named like `2026-03-27_14-05-30_default.webp` is saved in the **current working directory** (wherever Claude Code is running from).
 - Claude reports the absolute path.
-- Open the file — it should be a valid PNG.
+- Open the file — it should be a valid WebP image.
 
 ---
 
@@ -88,7 +88,7 @@ matching the context schema) and repeat — it should now appear in the list.
 
 **Expected:**
 - `background: "transparent"` is passed.
-- Open the PNG in a viewer that shows transparency (e.g. Preview on Mac) —
+- Open the WebP file in a viewer that shows transparency (e.g. Preview on Mac) —
   the background should be a checkerboard pattern, not white.
 
 ---
@@ -183,7 +183,7 @@ ls <output-directory>/
 ```
 
 **Check:**
-- Files are named `YYYY-MM-DD_HH-MM-SS_<context>.png`.
+- Files are named `YYYY-MM-DD_HH-MM-SS_<context>.webp`.
 - Timestamps sort chronologically.
 - No duplicate filenames (timestamps differ by at least one second between calls).
 

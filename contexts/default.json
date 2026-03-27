@@ -5,7 +5,7 @@
   "outputFormat": "PNG, 1024x1024",
   "negativePrompt": "",
   "model": "gpt-image-1.5",
-  "quality": "medium",
+  "quality": "low",
   "size": "1024x1024",
   "background": "opaque"
 }

@@ -50,8 +50,8 @@ export function registerGenerateTool(server, openai) {
           .enum(["low", "medium", "high"])
           .optional()
           .describe(
-            "Render quality. \"low\" is fastest and cheapest; \"high\" is most detailed. " +
-              "Defaults to the context's quality field, or \"medium\" if no context.",
+            "Render quality. ALWAYS default to \"low\" unless the user explicitly requests higher quality. " +
+              "Do NOT upgrade quality on the user's behalf. \"low\" is fast and sufficient for most tasks.",
           ),
 
         size: z
@@ -99,7 +99,7 @@ export function registerGenerateTool(server, openai) {
       }
 
       // Merge: explicit arg → context default → hard-coded fallback
-      const finalQuality    = quality    ?? ctx?.quality    ?? "medium";
+      const finalQuality    = quality    ?? ctx?.quality    ?? "low";
       const finalSize       = size       ?? ctx?.size       ?? "1024x1024";
       const finalBackground = background ?? ctx?.background ?? "opaque";
 
@@ -151,7 +151,7 @@ export function registerGenerateTool(server, openai) {
       }
 
       const imageBuffer = Buffer.from(b64, "base64");
-      const outputPath  = saveImage(imageBuffer, contextName, output_dir);
+      const outputPath  = await saveImage(imageBuffer, contextName, output_dir);
 
       // ------------------------------------------------------------------
       // 5. Return the saved file path to Claude Desktop.

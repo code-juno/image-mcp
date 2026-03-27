@@ -213,7 +213,7 @@ export function registerEditTool(server, openai) {
       }
 
       const imageBuffer = Buffer.from(b64, "base64");
-      const outputPath  = saveImage(imageBuffer, contextName, output_dir);
+      const outputPath  = await saveImage(imageBuffer, contextName, output_dir);
 
       return {
         content: [

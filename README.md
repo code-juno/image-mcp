@@ -16,7 +16,7 @@ image-mcp/
 ├── TESTING.md            ← manual end-to-end testing guide
 ├── contexts/             ← style presets (JSON)
 │   └── default.json
-├── outputs/              ← generated PNGs land here
+├── outputs/              ← generated WebP images land here
 │   └── .gitkeep
 ├── test/                 ← automated unit + integration tests
 │   ├── context.test.js   ← tests for src/utils/context.js
@@ -97,9 +97,9 @@ Generate a new image from a text prompt.
 | `quality`   | enum   | No       | `"medium"` | `"low"` / `"medium"` / `"high"` |
 | `size`      | enum   | No       | `"1024x1024"` | `"1024x1024"` / `"1536x1024"` (landscape) / `"1024x1536"` (portrait) |
 | `background`| enum   | No       | `"opaque"` | `"opaque"` / `"transparent"` |
-| `output_dir`| string | No       | caller's cwd | Directory where the PNG will be saved |
+| `output_dir`| string | No       | caller's cwd | Directory where the WebP file will be saved |
 
-Returns the absolute path of the saved PNG.
+Returns the absolute path of the saved WebP file.
 
 ---
 
@@ -114,9 +114,9 @@ Edit an existing image using a text prompt.
 | `context`   | string | No       | —          | Context preset name |
 | `quality`   | enum   | No       | `"medium"` | `"low"` / `"medium"` / `"high"` |
 | `size`      | enum   | No       | `"1024x1024"` | Same options as generate_image |
-| `output_dir`| string | No       | caller's cwd | Directory where the PNG will be saved |
+| `output_dir`| string | No       | caller's cwd | Directory where the WebP file will be saved |
 
-Returns the absolute path of the saved PNG.
+Returns the absolute path of the saved WebP file.
 
 ---
 
@@ -170,13 +170,13 @@ Then in Claude Desktop: *"Generate an image of a red barn at sunset using the ph
 
 ## Output files
 
-Images are saved using the naming pattern:
+Images are saved as WebP (quality 85) using the naming pattern:
 
 ```
-YYYY-MM-DD_HH-MM-SS_<contextName>.png
+YYYY-MM-DD_HH-MM-SS_<contextName>.webp
 ```
 
-For example: `2026-03-27_14-05-30_default.png`
+For example: `2026-03-27_14-05-30_default.webp`
 
 By default files land in the **caller's current working directory** — wherever
 Claude Code (or Claude Desktop) is running from.  Pass `output_dir` to override:
@@ -204,7 +204,7 @@ key or credits are needed.
 | File | What it tests |
 |------|--------------|
 | `test/context.test.js` | `buildPrompt` field ordering and empty-field skipping; `loadContext` happy path, missing file, malformed JSON; `listContexts` normal listing, malformed-file resilience, name fallback |
-| `test/storage.test.js` | `saveImage` return value, filename format, file written to disk, buffer contents, context-name sanitization, default `cwd` output dir, custom `output_dir`, auto-creation of missing directory |
+| `test/storage.test.js` | `saveImage` return value, `.webp` filename format, file written to disk, non-empty output after WebP conversion, context-name sanitization, default `cwd` output dir, custom `output_dir`, auto-creation of missing directory |
 | `test/generate.test.js` | `generate_image` happy path, context defaults, explicit-arg overrides, bad context, OpenAI error, missing `b64_json`, hard-coded fallbacks, prompt shaping |
 | `test/edit.test.js` | `edit_image` single/multi image, Uploadable vs. array routing, missing paths (all reported), mixed valid/invalid, bad context, OpenAI error, missing `b64_json`, MIME types per extension, parameter overrides |
 
