@@ -1,0 +1,16 @@
+{
+  "name": "image-mcp",
+  "version": "1.0.0",
+  "description": "Personal MCP server for image generation and editing via OpenAI gpt-image-1.5",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "dotenv": "^16.0.0",
+    "openai": "^6.33.0",
+    "zod": "^3.0.0"
+  }
+}

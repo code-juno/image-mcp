@@ -1,0 +1,11 @@
+{
+  "name": "default",
+  "description": "General purpose — no specific style applied",
+  "styleGuide": "",
+  "outputFormat": "PNG, 1024x1024",
+  "negativePrompt": "",
+  "model": "gpt-image-1.5",
+  "quality": "medium",
+  "size": "1024x1024",
+  "background": "opaque"
+}

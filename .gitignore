@@ -1,0 +1,10 @@
+# Environment — never commit your API key
+.env
+
+# Generated images — keep the folder, ignore the files
+outputs/*.png
+outputs/*.webp
+outputs/*.jpg
+
+# Dependencies
+node_modules/
