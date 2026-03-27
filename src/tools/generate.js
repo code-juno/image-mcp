@@ -66,8 +66,9 @@ export function registerGenerateTool(server, openai) {
           .enum(["transparent", "opaque"])
           .optional()
           .describe(
-            "Whether the image background should be transparent (PNG alpha channel) " +
-              "or opaque. Defaults to the context's background field, or \"opaque\".",
+            "Whether the image background should be transparent (PNG alpha channel) or opaque. " +
+              "ALWAYS default to \"opaque\" unless the user explicitly requests a transparent background. " +
+              "Do NOT use transparent on the user's behalf.",
           ),
 
         output_dir: z
