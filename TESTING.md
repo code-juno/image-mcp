@@ -1,7 +1,7 @@
 # Manual Testing Guide — image-mcp
 
 This document walks through every tool and edge case you should exercise before
-trusting the server in daily use.  All tests are run through Claude Desktop
+trusting the server in daily use.  All tests are run through Claude Code
 unless noted otherwise.
 
 ---
@@ -10,10 +10,11 @@ unless noted otherwise.
 
 1. `npm install` is done and `node_modules/` exists.
 2. `.env` exists with a valid `OPENAI_API_KEY`.
-3. The server is registered in `claude_desktop_config.json` and Claude Desktop
-   has been restarted.
-4. You can see **image-mcp** listed under Settings → Developer → MCP Servers
-   with a green "connected" indicator.
+3. The server is registered via:
+   ```bash
+   claude mcp add image-mcp --scope user --transport stdio --env OPENAI_API_KEY=your-key-here -- node /path/to/image-mcp/src/index.js
+   ```
+4. Run `claude mcp list` and confirm **image-mcp** appears.
 
 ---
 
@@ -35,7 +36,7 @@ node src/index.js
 
 ## 1 — `list_contexts`
 
-**In Claude Desktop:** *"List all available image contexts"*
+**In Claude Code:** *"List all available image contexts"*
 
 **Expected output:**
 ```
@@ -178,13 +179,20 @@ ls outputs/
 
 ## 12 — Bad API key
 
-Set a wrong key in `.env`, restart Claude Desktop, then try generating an image.
+Remove the server and re-add it with a wrong key:
+
+```bash
+claude mcp remove image-mcp
+claude mcp add image-mcp --scope user --transport stdio --env OPENAI_API_KEY=bad-key -- node /path/to/image-mcp/src/index.js
+```
+
+Then try generating an image.
 
 **Expected:**
 - Claude returns: `OpenAI API error: ...` with a meaningful message (e.g. `401 Incorrect API key`).
 - No file is written.
 - The server does not crash — subsequent tool calls should still work after
-  you restore the correct key and restart.
+  you restore the correct key and re-add the server.
 
 ---
 
