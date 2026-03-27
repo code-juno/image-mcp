@@ -51,6 +51,18 @@ cp .env.example .env
 
 ---
 
+## Configuration — Claude Code
+
+Run this command to add the server globally (available in all projects):
+
+```bash
+claude mcp add image-mcp --scope user --transport stdio --env OPENAI_API_KEY=your-key-here -- node /Users/codejuno/mcp/image-mcp/src/index.js
+```
+
+Replace `your-key-here` with your OpenAI API key and update the path if needed.
+
+---
+
 ## Configuration — Claude Desktop
 
 Add the server to `~/Library/Application Support/Claude/claude_desktop_config.json`
