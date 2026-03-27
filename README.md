@@ -13,10 +13,16 @@ image-mcp/
 ├── .gitignore
 ├── package.json
 ├── README.md
+├── TESTING.md            ← manual end-to-end testing guide
 ├── contexts/             ← style presets (JSON)
 │   └── default.json
 ├── outputs/              ← generated PNGs land here
 │   └── .gitkeep
+├── test/                 ← automated unit + integration tests
+│   ├── context.test.js   ← tests for src/utils/context.js
+│   ├── storage.test.js   ← tests for src/utils/storage.js
+│   ├── generate.test.js  ← tests for generate_image tool handler
+│   └── edit.test.js      ← tests for edit_image tool handler
 └── src/
     ├── index.js          ← server bootstrap
     ├── tools/
@@ -91,7 +97,7 @@ Edit an existing image using a text prompt.
 | Parameter    | Type   | Required | Default    | Description |
 |-------------|--------|----------|------------|-------------|
 | `prompt`    | string | Yes      | —          | Description of the edits to apply |
-| `image_path`| string | Yes      | —          | Path to the source image (PNG/WEBP/JPG, < 50 MB) |
+| `image_paths`| array | Yes      | —          | Array of 1–16 paths to source images (PNG/WEBP/JPG, < 50 MB each) |
 | `context`   | string | No       | —          | Context preset name |
 | `quality`   | enum   | No       | `"medium"` | `"low"` / `"medium"` / `"high"` |
 | `size`      | enum   | No       | `"1024x1024"` | Same options as generate_image |
@@ -160,6 +166,30 @@ For example: `2025-03-27_14-05-30_default.png`
 
 The `/outputs` directory is git-ignored (only `.gitkeep` is tracked) so your
 generated images never end up in version control.
+
+---
+
+## Testing
+
+The automated test suite uses Node's built-in test runner — no extra dependencies required.
+
+```bash
+npm test
+```
+
+71 tests run in well under a second.  The OpenAI API is fully mocked, so no
+key or credits are needed.
+
+**What is covered:**
+
+| File | What it tests |
+|------|--------------|
+| `test/context.test.js` | `buildPrompt` field ordering and empty-field skipping; `loadContext` happy path, missing file, malformed JSON; `listContexts` normal listing, malformed-file resilience, name fallback |
+| `test/storage.test.js` | `saveImage` return value, filename format, file written to disk, buffer contents, context-name sanitization, `outputs/` auto-creation |
+| `test/generate.test.js` | `generate_image` happy path, context defaults, explicit-arg overrides, bad context, OpenAI error, missing `b64_json`, hard-coded fallbacks, prompt shaping |
+| `test/edit.test.js` | `edit_image` single/multi image, Uploadable vs. array routing, missing paths (all reported), mixed valid/invalid, bad context, OpenAI error, missing `b64_json`, MIME types per extension, parameter overrides |
+
+For manual end-to-end testing through Claude Desktop, see **TESTING.md**.
 
 ---
 

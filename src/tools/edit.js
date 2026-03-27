@@ -1,13 +1,20 @@
 /**
  * edit.js — MCP tool: edit_image
  *
- * Reads an existing image from disk, calls the OpenAI images.edit() endpoint
- * with gpt-image-1.5, saves the result as a PNG in /outputs, and returns
- * the file path.
+ * Reads one or more existing images from disk, calls the OpenAI images.edit()
+ * endpoint with gpt-image-1.5, saves the result as a PNG in /outputs, and
+ * returns the file path.
  *
- * The OpenAI edit endpoint expects the image as an "Uploadable".  In Node.js
- * we use the toFile() helper from the openai package to wrap a ReadStream so
- * the SDK can attach the correct filename and MIME type to the multipart upload.
+ * Multiple input images: gpt-image-1.5 accepts up to 16 source images in a
+ * single edit call.  Pass them via image_paths (array of file paths).  When
+ * more than one image is provided the model uses all of them as visual context
+ * — useful for style transfer, compositing, or maintaining consistency across
+ * a set of reference images.
+ *
+ * The OpenAI edit endpoint expects each image as an "Uploadable".  In Node.js
+ * we use the toFile() helper from the openai package to wrap each ReadStream
+ * so the SDK can attach the correct filename and MIME type to the multipart
+ * upload.
  */
 
 import fs from "node:fs";
@@ -16,6 +23,17 @@ import { toFile } from "openai";
 import { z } from "zod";
 import { loadContext, buildPrompt } from "../utils/context.js";
 import { saveImage } from "../utils/storage.js";
+
+const MIME_TYPES = {
+  ".png":  "image/png",
+  ".jpg":  "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+};
+
+function getMimeType(filePath) {
+  return MIME_TYPES[path.extname(filePath).toLowerCase()] ?? "image/png";
+}
 
 /**
  * Register the edit_image tool on the given McpServer instance.
@@ -29,20 +47,25 @@ export function registerEditTool(server, openai) {
     {
       title: "Edit Image",
       description:
-        "Edit or extend an existing image using OpenAI gpt-image-1.5. " +
-        "Provide the path to a source image and a prompt describing the desired changes. " +
+        "Edit or extend one or more existing images using OpenAI gpt-image-1.5. " +
+        "Provide 1–16 source image paths and a prompt describing the desired changes. " +
+        "When multiple images are supplied the model uses all of them as visual context. " +
         "The edited image is saved to disk and the file path is returned.",
 
       inputSchema: {
         prompt: z
           .string()
-          .describe("Text description of the edits to apply to the image."),
+          .describe("Text description of the edits to apply to the image(s)."),
 
-        image_path: z
-          .string()
+        image_paths: z
+          .array(z.string())
+          .min(1)
+          .max(16)
           .describe(
-            "Absolute (or relative to the project root) path to the source image file. " +
-              "Must be a PNG, WEBP, or JPG file under 50 MB.",
+            "Array of absolute (or project-root-relative) paths to source image files. " +
+              "Each must be a PNG, WEBP, or JPG file under 50 MB. " +
+              "Provide 1–16 images; when multiple are given the model treats them all " +
+              "as visual context for the edit.",
           ),
 
         context: z
@@ -66,17 +89,21 @@ export function registerEditTool(server, openai) {
       },
     },
 
-    async ({ prompt, image_path, context, quality, size }) => {
+    async ({ prompt, image_paths, context, quality, size }) => {
       // ------------------------------------------------------------------
-      // 1. Validate the source image path.
+      // 1. Validate that every source image path exists on disk.
+      //    We check all of them up-front so the user gets one consolidated
+      //    error instead of failing partway through.
       // ------------------------------------------------------------------
-      const resolvedPath = path.resolve(image_path);
-      if (!fs.existsSync(resolvedPath)) {
+      const resolvedPaths = image_paths.map((p) => path.resolve(p));
+      const missing = resolvedPaths.filter((p) => !fs.existsSync(p));
+
+      if (missing.length > 0) {
         return {
           content: [
             {
               type: "text",
-              text: `File not found: ${resolvedPath}`,
+              text: `File(s) not found:\n${missing.map((p) => `  • ${p}`).join("\n")}`,
             },
           ],
         };
@@ -106,25 +133,32 @@ export function registerEditTool(server, openai) {
       const finalPrompt = buildPrompt(prompt, ctx);
 
       // ------------------------------------------------------------------
-      // 4. Wrap the source image in a toFile() Uploadable.
+      // 4. Wrap each source image in a toFile() Uploadable.
       //
-      //    The OpenAI SDK's edit endpoint requires an "Uploadable" — this is
-      //    its term for a File-like object with a name and MIME type.
-      //    toFile() handles that wrapping for us from a Node.js ReadStream.
+      //    The OpenAI SDK's edit endpoint requires "Uploadable" objects —
+      //    File-like values with a name and MIME type.  toFile() wraps a
+      //    Node.js ReadStream into that shape.
+      //
+      //    We run all conversions in parallel with Promise.all() since each
+      //    one is independent I/O.
       // ------------------------------------------------------------------
-      let imageFile;
+      let imageFiles;
       try {
-        imageFile = await toFile(
-          fs.createReadStream(resolvedPath),
-          path.basename(resolvedPath), // filename sent to the API
-          { type: "image/png" },       // MIME type — treat all inputs as PNG
+        imageFiles = await Promise.all(
+          resolvedPaths.map((p) =>
+            toFile(
+              fs.createReadStream(p),
+              path.basename(p),  // filename sent to the API
+              { type: getMimeType(p) },
+            ),
+          ),
         );
       } catch (err) {
         return {
           content: [
             {
               type: "text",
-              text: `Failed to read image file: ${err.message}`,
+              text: `Failed to read image file(s): ${err.message}`,
             },
           ],
         };
@@ -132,12 +166,14 @@ export function registerEditTool(server, openai) {
 
       // ------------------------------------------------------------------
       // 5. Call the OpenAI image editing API.
+      //    Pass a single Uploadable when there is only one image, or the
+      //    full array when there are multiple — both are valid per the API.
       // ------------------------------------------------------------------
       let response;
       try {
         response = await openai.images.edit({
           model: "gpt-image-1.5",
-          image: imageFile,
+          image: imageFiles.length === 1 ? imageFiles[0] : imageFiles,
           prompt: finalPrompt,
           quality: finalQuality,
           size: finalSize,
