@@ -58,8 +58,8 @@ export function registerGenerateTool(server, openai) {
           .enum(["1024x1024", "1536x1024", "1024x1536"])
           .optional()
           .describe(
-            "Output dimensions. 1536x1024 is landscape, 1024x1536 is portrait. " +
-              "Defaults to the context's size field, or \"1024x1024\".",
+            "Output dimensions. ALWAYS default to \"1024x1024\" unless the user explicitly requests landscape or portrait. " +
+              "Do NOT change the size on the user's behalf. 1536x1024 is landscape, 1024x1536 is portrait.",
           ),
 
         background: z
