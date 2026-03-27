@@ -24,8 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { registerGenerateTool } from "../src/tools/generate.js";
 
-const __dirname  = path.dirname(fileURLToPath(import.meta.url));
-const outputsDir = path.resolve(__dirname, "../outputs");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Minimal 1×1 transparent PNG encoded as base64 — valid enough for Buffer.from.
 const FAKE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -66,9 +65,10 @@ function parsePath(result) {
   return result.content[0].text.replace("Image saved to: ", "");
 }
 
-/** Snapshot the set of files in outputs/ so we can detect new ones. */
+/** Snapshot the set of files in cwd so we can detect new ones. */
 function outputSnapshot() {
-  return new Set(fs.existsSync(outputsDir) ? fs.readdirSync(outputsDir) : []);
+  const cwd = process.cwd();
+  return new Set(fs.existsSync(cwd) ? fs.readdirSync(cwd) : []);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ describe("generate_image tool", () => {
     assert.ok(result.content[0].text.includes("nonexistent_xyz"));
   });
 
-  test("invalid context name: no file is written to outputs/", async () => {
+  test("invalid context name: no file is written", async () => {
     const { server, call } = makeServer();
     registerGenerateTool(server, makeOpenAI());
     const before = outputSnapshot();
@@ -189,7 +189,7 @@ describe("generate_image tool", () => {
     assert.ok(result.content[0].text.includes("401 Incorrect API key"));
   });
 
-  test("OpenAI throws: no file is written to outputs/", async () => {
+  test("OpenAI throws: no file is written", async () => {
     const { server, call } = makeServer();
     registerGenerateTool(server, makeOpenAI(async () => { throw new Error("API error"); }));
     const before = outputSnapshot();

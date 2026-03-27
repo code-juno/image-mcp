@@ -86,10 +86,18 @@ export function registerEditTool(server, openai) {
           .enum(["1024x1024", "1536x1024", "1024x1536"])
           .optional()
           .describe("Output dimensions. Defaults to context size or \"1024x1024\"."),
+
+        output_dir: z
+          .string()
+          .optional()
+          .describe(
+            "Directory where the output PNG will be saved. " +
+              "Defaults to the caller's current working directory.",
+          ),
       },
     },
 
-    async ({ prompt, image_paths, context, quality, size }) => {
+    async ({ prompt, image_paths, context, quality, size, output_dir }) => {
       // ------------------------------------------------------------------
       // 1. Validate that every source image path exists on disk.
       //    We check all of them up-front so the user gets one consolidated
@@ -205,7 +213,7 @@ export function registerEditTool(server, openai) {
       }
 
       const imageBuffer = Buffer.from(b64, "base64");
-      const outputPath  = saveImage(imageBuffer, contextName);
+      const outputPath  = saveImage(imageBuffer, contextName, output_dir);
 
       return {
         content: [

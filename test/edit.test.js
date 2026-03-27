@@ -30,9 +30,8 @@ import { fileURLToPath } from "node:url";
 
 import { registerEditTool } from "../src/tools/edit.js";
 
-const __dirname  = path.dirname(fileURLToPath(import.meta.url));
-const outputsDir = path.resolve(__dirname, "../outputs");
-const tmpDir     = path.resolve(__dirname, "../outputs/_test_edit_tmp");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const tmpDir    = path.resolve(__dirname, "../outputs/_test_edit_tmp");
 
 // Minimal valid PNG buffer (1×1 pixel).
 const FAKE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -86,7 +85,8 @@ function parsePath(result) {
 }
 
 function outputSnapshot() {
-  return new Set(fs.existsSync(outputsDir) ? fs.readdirSync(outputsDir) : []);
+  const cwd = process.cwd();
+  return new Set(fs.existsSync(cwd) ? fs.readdirSync(cwd) : []);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ describe("edit_image tool", () => {
     assert.ok(!result.content[0].text.includes(tmpPng1), "valid path should NOT be in error");
   });
 
-  test("missing path: no file written to outputs/", async () => {
+  test("missing path: no file written", async () => {
     const { server, call } = makeServer();
     registerEditTool(server, makeOpenAI());
     const before = outputSnapshot();
@@ -199,7 +199,7 @@ describe("edit_image tool", () => {
     assert.ok(result.content[0].text.includes("500 Server Error"));
   });
 
-  test("OpenAI throws: no file written to outputs/", async () => {
+  test("OpenAI throws: no file written", async () => {
     const { server, call } = makeServer();
     registerEditTool(server, makeOpenAI(async () => { throw new Error("API error"); }));
     const before = outputSnapshot();

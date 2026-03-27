@@ -69,10 +69,18 @@ export function registerGenerateTool(server, openai) {
             "Whether the image background should be transparent (PNG alpha channel) " +
               "or opaque. Defaults to the context's background field, or \"opaque\".",
           ),
+
+        output_dir: z
+          .string()
+          .optional()
+          .describe(
+            "Directory where the output PNG will be saved. " +
+              "Defaults to the caller's current working directory.",
+          ),
       },
     },
 
-    async ({ prompt, context, quality, size, background }) => {
+    async ({ prompt, context, quality, size, background, output_dir }) => {
       // ------------------------------------------------------------------
       // 1. Load context preset (if requested) and resolve final parameters.
       //    Explicit tool arguments always win over context defaults.
@@ -143,7 +151,7 @@ export function registerGenerateTool(server, openai) {
       }
 
       const imageBuffer = Buffer.from(b64, "base64");
-      const outputPath  = saveImage(imageBuffer, contextName);
+      const outputPath  = saveImage(imageBuffer, contextName, output_dir);
 
       // ------------------------------------------------------------------
       // 5. Return the saved file path to Claude Desktop.

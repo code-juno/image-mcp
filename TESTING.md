@@ -55,8 +55,8 @@ matching the context schema) and repeat — it should now appear in the list.
 
 **Expected:**
 - Claude calls `generate_image` with just `prompt`.
-- A file appears in `outputs/` named like `2025-03-27_14-05-30_default.png`.
-- Claude reports the path.
+- A file named like `2026-03-27_14-05-30_default.png` is saved in the **current working directory** (wherever Claude Code is running from).
+- Claude reports the absolute path.
 - Open the file — it should be a valid PNG.
 
 ---
@@ -68,6 +68,17 @@ matching the context schema) and repeat — it should now appear in the list.
 **Expected:**
 - `quality: "high"` and `size: "1024x1536"` are passed to the API.
 - Output file is a tall portrait-orientation image.
+
+---
+
+## 3b — `generate_image` — custom output directory
+
+**Prompt:** *"Generate an image of a mountain lake, save it to ~/Desktop"*
+
+**Expected:**
+- `output_dir` is set to `~/Desktop` (or its absolute equivalent).
+- The file appears on the Desktop, not in the working directory.
+- Directory is created automatically if it does not exist.
 
 ---
 
@@ -164,10 +175,11 @@ Or more naturally: *"Use edit_image with image_paths set to [path1, path2] and p
 
 ## 11 — Output file naming
 
-After running a few generate/edit tests, inspect `outputs/`:
+After running a few generate/edit tests, inspect the directory where files were saved
+(your cwd, or the `output_dir` you specified):
 
 ```bash
-ls outputs/
+ls <output-directory>/
 ```
 
 **Check:**
@@ -196,17 +208,15 @@ Then try generating an image.
 
 ---
 
-## 13 — `outputs/` directory missing
+## 13 — Custom output directory auto-creation
 
-Delete the `outputs/` directory entirely, then generate an image.
+Pass a directory that does not yet exist as `output_dir`, then generate an image.
 
-```bash
-rm -rf outputs/
-```
+**Prompt:** *"Generate an image of a sunset, save to /tmp/image-mcp-test"*
 
 **Expected:**
-- `saveImage()` recreates the directory automatically (`mkdirSync` with `recursive: true`).
-- The file is saved successfully.
+- `saveImage()` creates `/tmp/image-mcp-test` automatically (`mkdirSync` with `recursive: true`).
+- The file is saved successfully inside that directory.
 
 ---
 
@@ -216,8 +226,9 @@ rm -rf outputs/
 |---|------|----------|-------|
 | 0 | — | Missing API key → clean exit | |
 | 1 | list_contexts | Lists default context | |
-| 2 | generate_image | Basic prompt, no params | |
+| 2 | generate_image | Basic prompt — file saved to cwd | |
 | 3 | generate_image | Explicit quality + size | |
+| 3b | generate_image | Custom `output_dir` — file saved there | |
 | 4 | generate_image | Transparent background | |
 | 5 | generate_image | Context shapes the prompt | |
 | 6 | generate_image | Invalid context name | |
@@ -227,4 +238,4 @@ rm -rf outputs/
 | 10 | edit_image | Mixed valid/invalid paths | |
 | 11 | — | Output filenames correct | |
 | 12 | — | Bad API key → graceful error | |
-| 13 | — | Missing outputs/ dir → auto-created | |
+| 13 | — | Missing output dir → auto-created | |

@@ -19,8 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { saveImage } from "../src/utils/storage.js";
 
-const __dirname  = path.dirname(fileURLToPath(import.meta.url));
-const outputsDir = path.resolve(__dirname, "../outputs");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Track every file written by tests so we can delete them afterwards.
 const writtenFiles = [];
@@ -71,10 +70,17 @@ describe("saveImage", () => {
     assert.deepEqual(written, buf);
   });
 
-  test("file is saved inside the outputs/ directory", () => {
+  test("defaults to process.cwd() when no outputDir is given", () => {
     const result = saveImage(FAKE_BUFFER, "dircheck");
     writtenFiles.push(result);
-    assert.equal(path.dirname(result), outputsDir);
+    assert.equal(path.dirname(result), process.cwd());
+  });
+
+  test("saves to a custom outputDir when provided", () => {
+    const customDir = path.resolve(__dirname, "../outputs/_test_custom_dir");
+    const result = saveImage(FAKE_BUFFER, "customdir", customDir);
+    assert.equal(path.dirname(result), customDir);
+    fs.rmSync(customDir, { recursive: true, force: true });
   });
 
   test("sanitizes forward slashes in context name", () => {
@@ -106,31 +112,12 @@ describe("saveImage", () => {
     assert.ok(basename.endsWith("_default.png"), `expected '_default.png' suffix, got: ${basename}`);
   });
 
-  test("auto-creates outputs/ directory if it does not exist", () => {
-    // Rename the directory away, run saveImage, then restore it.
-    const backup = outputsDir + "_bak_" + Date.now();
-    if (fs.existsSync(outputsDir)) {
-      fs.renameSync(outputsDir, backup);
-    }
-
-    let result;
-    try {
-      result = saveImage(FAKE_BUFFER, "recreate");
-      assert.ok(fs.existsSync(result), "file should be created even when outputs/ was absent");
-    } finally {
-      // Move the newly-created file into the backup, then restore backup as outputs/
-      if (result && fs.existsSync(result)) {
-        writtenFiles.push(result); // register for later cleanup
-        const newOutputsDir = path.dirname(result); // should be the recreated outputs/
-        // move every file from the recreated dir into backup
-        for (const f of fs.readdirSync(newOutputsDir)) {
-          fs.renameSync(path.join(newOutputsDir, f), path.join(backup, f));
-        }
-        fs.rmdirSync(newOutputsDir);
-      }
-      if (fs.existsSync(backup)) {
-        fs.renameSync(backup, outputsDir);
-      }
-    }
+  test("auto-creates outputDir if it does not exist", () => {
+    const newDir = path.resolve(__dirname, "../outputs/_test_autocreate_" + Date.now());
+    assert.ok(!fs.existsSync(newDir), "precondition: dir should not exist yet");
+    const result = saveImage(FAKE_BUFFER, "recreate", newDir);
+    writtenFiles.push(result);
+    assert.ok(fs.existsSync(result), "file should be created even when outputDir was absent");
+    fs.rmSync(newDir, { recursive: true, force: true });
   });
 });
