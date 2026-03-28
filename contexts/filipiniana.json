@@ -1,0 +1,13 @@
+{
+  "name": "filipiniana",
+  "description": "Modern Filipiniana — flat vector, Ocean Blue / Rust Red / Pearl palette",
+  "styleGuide": "Modern Filipiniana flat vector style. Clean bold lines with a slight offset color fill. Strict color palette: Ocean Blue (#457B9D), Rust Red (#8B2635), Pearl (#EAE0D5). No gradients, no shadows, minimal paths, sophisticated and minimal.",
+  "outputFormat": "WebP, 1024x1024",
+  "negativePrompt": "gradients, drop shadows, photorealism, green, brown, extra colors outside the palette",
+  "quality": "low",
+  "size": "1024x1024",
+  "background": "opaque",
+  "referenceImages": [
+    "./references/filipiniana-ref.webp"
+  ]
+}

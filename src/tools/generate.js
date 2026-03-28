@@ -4,11 +4,44 @@
  * Calls the OpenAI images.generate() endpoint with gpt-image-1.5,
  * optionally shapes the prompt using a context preset, saves the result
  * as a PNG in /outputs, and returns the file path.
+ *
+ * When a context preset includes a `referenceImages` array, the tool
+ * automatically switches to images.edit() so the model can use those
+ * images as visual style references alongside the prompt.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { toFile } from "openai";
 import { z } from "zod";
 import { loadContext, buildPrompt } from "../utils/context.js";
 import { saveImage } from "../utils/storage.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const contextsDir = path.resolve(__dirname, "../../contexts");
+
+const MIME_TYPES = {
+  ".png":  "image/png",
+  ".jpg":  "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+};
+
+function getMimeType(filePath) {
+  return MIME_TYPES[path.extname(filePath).toLowerCase()] ?? "image/png";
+}
+
+/**
+ * Resolve a reference image path from a context file.
+ * Paths starting with "." are resolved relative to the /contexts directory.
+ * Absolute paths are used as-is.
+ */
+function resolveRefPath(refPath) {
+  return path.isAbsolute(refPath)
+    ? refPath
+    : path.resolve(contextsDir, refPath);
+}
 
 /**
  * Register the generate_image tool on the given McpServer instance.
@@ -110,21 +143,54 @@ export function registerGenerateTool(server, openai) {
       const finalPrompt = buildPrompt(prompt, ctx);
 
       // ------------------------------------------------------------------
-      // 3. Call the OpenAI image generation API.
+      // 3. Call the OpenAI image API.
       //
-      //    gpt-image-1.5 always returns base64 JSON data — there is no
-      //    URL option for this model, so we don't set response_format.
+      //    If the context includes referenceImages, resolve and upload them
+      //    via images.edit() so the model uses them as visual style context.
+      //    Otherwise fall back to the standard images.generate() text-only call.
+      //
+      //    gpt-image-1.5 always returns base64 JSON — no response_format needed.
       // ------------------------------------------------------------------
+      const refPaths = (ctx?.referenceImages ?? []).map(resolveRefPath);
+      const missing  = refPaths.filter((p) => !fs.existsSync(p));
+
+      if (missing.length > 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Reference image(s) not found:\n${missing.map((p) => `  • ${p}`).join("\n")}`,
+            },
+          ],
+        };
+      }
+
       let response;
       try {
-        response = await openai.images.generate({
-          model: "gpt-image-1.5",
-          prompt: finalPrompt,
-          quality: finalQuality,
-          size: finalSize,
-          background: finalBackground,
-          // n defaults to 1; we always generate a single image per call.
-        });
+        if (refPaths.length > 0) {
+          // images.edit() accepts reference images as visual context.
+          const imageFiles = await Promise.all(
+            refPaths.map((p) =>
+              toFile(fs.createReadStream(p), path.basename(p), { type: getMimeType(p) }),
+            ),
+          );
+
+          response = await openai.images.edit({
+            model: "gpt-image-1.5",
+            image: imageFiles.length === 1 ? imageFiles[0] : imageFiles,
+            prompt: finalPrompt,
+            quality: finalQuality,
+            size: finalSize,
+          });
+        } else {
+          response = await openai.images.generate({
+            model: "gpt-image-1.5",
+            prompt: finalPrompt,
+            quality: finalQuality,
+            size: finalSize,
+            background: finalBackground,
+          });
+        }
       } catch (err) {
         return {
           content: [

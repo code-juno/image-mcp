@@ -115,6 +115,37 @@ it, e.g.:
 
 ---
 
+## 5b — `generate_image` — context with reference images
+
+**Setup:** you need a context that has `referenceImages` pointing to an image
+that exists on disk.  Use the included `filipiniana` context as a starting point —
+first copy or save a reference image to `contexts/references/filipiniana-ref.webp`.
+
+**Prompt:** *"Generate a flat vector icon of a jeepney using the filipiniana context"*
+
+**Expected:**
+- The tool routes through `images.edit()` (not `images.generate()`) because the context
+  has `referenceImages`.
+- Output image reflects the style/palette of the reference image.
+- File is saved and path is returned normally.
+
+**Then test a missing reference image:**
+
+Temporarily set `referenceImages` in any context to a file that doesn't exist:
+
+```json
+"referenceImages": ["./references/does_not_exist.webp"]
+```
+
+**Prompt:** *"Generate an image of a cat using that context"*
+
+**Expected:**
+- Returns: `Reference image(s) not found: • <resolved-path>`
+- No file is written.
+- Restore the context file after testing.
+
+---
+
 ## 6 — `generate_image` — bad context name
 
 **Prompt:** *"Generate an image of a cat using context 'nonexistent'"*
@@ -231,6 +262,8 @@ Pass a directory that does not yet exist as `output_dir`, then generate an image
 | 3b | generate_image | Custom `output_dir` — file saved there | |
 | 4 | generate_image | Transparent background | |
 | 5 | generate_image | Context shapes the prompt | |
+| 5b | generate_image | Context with `referenceImages` — routes to edit, output reflects style | |
+| 5c | generate_image | Context with missing `referenceImages` — error, no file written | |
 | 6 | generate_image | Invalid context name | |
 | 7 | edit_image | Single image | |
 | 8 | edit_image | Multiple images as context | |

@@ -15,7 +15,8 @@ image-mcp/
 ├── README.md
 ├── TESTING.md            ← manual end-to-end testing guide
 ├── contexts/             ← style presets (JSON)
-│   └── default.json
+│   ├── default.json
+│   └── references/       ← reference images used by context presets
 ├── outputs/              ← generated WebP images land here
 │   └── .gitkeep
 ├── test/                 ← automated unit + integration tests
@@ -135,19 +136,54 @@ particular use-case.  You can create as many as you like.
 
 **Field reference:**
 
-| Field           | Type   | Description |
-|----------------|--------|-------------|
-| `name`         | string | Identifier used when calling tools (`context: "my-preset"`) |
-| `description`  | string | Shown by `list_contexts` |
-| `styleGuide`   | string | Prepended to the user prompt (e.g. `"Photorealistic, high detail"`) |
-| `outputFormat` | string | Appended as `Output format: <value>` (informational for the model) |
-| `negativePrompt`| string | Appended as `Avoid: <value>` |
-| `model`        | string | Reserved — currently always `"gpt-image-1.5"` |
-| `quality`      | string | Default quality for this context (`"low"` / `"medium"` / `"high"`) |
-| `size`         | string | Default size (`"1024x1024"` / `"1536x1024"` / `"1024x1536"`) |
-| `background`   | string | Default background (`"opaque"` / `"transparent"`) |
+| Field             | Type     | Description |
+|------------------|----------|-------------|
+| `name`           | string   | Identifier used when calling tools (`context: "my-preset"`) |
+| `description`    | string   | Shown by `list_contexts` |
+| `styleGuide`     | string   | Prepended to the user prompt (e.g. `"Photorealistic, high detail"`) |
+| `outputFormat`   | string   | Appended as `Output format: <value>` (informational for the model) |
+| `negativePrompt` | string   | Appended as `Avoid: <value>` |
+| `model`          | string   | Reserved — currently always `"gpt-image-1.5"` |
+| `quality`        | string   | Default quality for this context (`"low"` / `"medium"` / `"high"`) |
+| `size`           | string   | Default size (`"1024x1024"` / `"1536x1024"` / `"1024x1536"`) |
+| `background`     | string   | Default background (`"opaque"` / `"transparent"`) |
+| `referenceImages`| string[] | Paths to reference images used as visual style context (see below) |
 
-**Example — adding a "photo" context:**
+**Reference images**
+
+When a context includes `referenceImages`, `generate_image` automatically routes through
+`images.edit()` instead of `images.generate()`, passing the reference images to the model
+alongside the prompt. This lets the model match a specific palette, composition, or style
+without relying on text description alone.
+
+- Paths are relative to the `/contexts` directory, or absolute.
+- Store reference images in `contexts/references/` by convention.
+- Keep reference images small — **512×512 or smaller** is sufficient for style/palette
+  cues and minimises input token cost. JPEG or WebP is preferred over PNG.
+- Up to 16 reference images are supported per call.
+
+**Example — a style context with reference images:**
+
+```json
+// contexts/filipiniana.json
+{
+  "name": "filipiniana",
+  "description": "Modern Filipiniana — flat vector, Ocean Blue / Rust Red / Pearl palette",
+  "styleGuide": "Modern Filipiniana flat vector style. Clean bold lines with a slight offset color fill. Strict color palette: Ocean Blue (#457B9D), Rust Red (#8B2635), Pearl (#EAE0D5). No gradients, no shadows, minimal paths.",
+  "outputFormat": "WebP, 1024x1024",
+  "negativePrompt": "gradients, drop shadows, photorealism, green, brown, extra colors outside the palette",
+  "quality": "low",
+  "size": "1024x1024",
+  "background": "opaque",
+  "referenceImages": [
+    "./references/filipiniana-ref.webp"
+  ]
+}
+```
+
+Then: *"Generate a flat vector icon of a jeepney using the filipiniana context"*
+
+**Example — a basic context without reference images:**
 
 ```json
 // contexts/photo.json
@@ -157,14 +193,13 @@ particular use-case.  You can create as many as you like.
   "styleGuide": "Photorealistic DSLR photograph, natural lighting, sharp focus",
   "outputFormat": "PNG, 1024x1024",
   "negativePrompt": "illustration, cartoon, painting, CGI, text, watermark",
-  "model": "gpt-image-1.5",
   "quality": "high",
   "size": "1024x1024",
   "background": "opaque"
 }
 ```
 
-Then in Claude Desktop: *"Generate an image of a red barn at sunset using the photo context"*
+Then: *"Generate an image of a red barn at sunset using the photo context"*
 
 ---
 
@@ -196,8 +231,7 @@ The automated test suite uses Node's built-in test runner — no extra dependenc
 npm test
 ```
 
-72 tests run in well under a second.  The OpenAI API is fully mocked, so no
-key or credits are needed.
+The OpenAI API is fully mocked, so no key or credits are needed.
 
 **What is covered:**
 
@@ -205,7 +239,7 @@ key or credits are needed.
 |------|--------------|
 | `test/context.test.js` | `buildPrompt` field ordering and empty-field skipping; `loadContext` happy path, missing file, malformed JSON; `listContexts` normal listing, malformed-file resilience, name fallback |
 | `test/storage.test.js` | `saveImage` return value, `.webp` filename format, file written to disk, non-empty output after WebP conversion, context-name sanitization, default `cwd` output dir, custom `output_dir`, auto-creation of missing directory |
-| `test/generate.test.js` | `generate_image` happy path, context defaults, explicit-arg overrides, bad context, OpenAI error, missing `b64_json`, hard-coded fallbacks, prompt shaping |
+| `test/generate.test.js` | `generate_image` happy path, context defaults, explicit-arg overrides, bad context, OpenAI error, missing `b64_json`, hard-coded fallbacks, prompt shaping; context with `referenceImages` routes to `images.edit()`, passes image files, missing reference image error |
 | `test/edit.test.js` | `edit_image` single/multi image, Uploadable vs. array routing, missing paths (all reported), mixed valid/invalid, bad context, OpenAI error, missing `b64_json`, MIME types per extension, parameter overrides |
 
 For manual end-to-end testing through Claude Desktop, see **TESTING.md**.

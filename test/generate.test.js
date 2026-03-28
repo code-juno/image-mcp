@@ -14,6 +14,9 @@
  *  - Missing b64_json in response → error text
  *  - Hard-coded fallback defaults (quality=medium, size=1024x1024, background=opaque)
  *  - Prompt is shaped by context fields (outputFormat present in sent prompt)
+ *  - Context with referenceImages → routes to images.edit(), not images.generate()
+ *  - Context with referenceImages → reference image files passed to edit call
+ *  - Context with missing referenceImages → error text, no file written
  */
 
 import { describe, test, after } from "node:test";
@@ -51,11 +54,12 @@ function makeServer() {
   return { server, call: (name, args) => handlers[name](args) };
 }
 
-/** Returns a mock OpenAI client with a successful images.generate. */
-function makeOpenAI(generateFn) {
+/** Returns a mock OpenAI client with successful images.generate and images.edit stubs. */
+function makeOpenAI(generateFn, editFn) {
   return {
     images: {
       generate: generateFn ?? (async () => ({ data: [{ b64_json: FAKE_B64 }] })),
+      edit:     editFn     ?? (async () => ({ data: [{ b64_json: FAKE_B64 }] })),
     },
   };
 }
@@ -92,13 +96,13 @@ describe("generate_image tool", () => {
     assert.ok(fs.existsSync(p), `expected file at: ${p}`);
   });
 
-  test("uses medium quality by default (no context, no explicit args)", async () => {
+  test("uses low quality by default (no context, no explicit args)", async () => {
     let captured;
     const { server, call } = makeServer();
     registerGenerateTool(server, makeOpenAI(async (args) => { captured = args; return { data: [{ b64_json: FAKE_B64 }] }; }));
     const result = await call("generate_image", { prompt: "a cat" });
     writtenFiles.push(parsePath(result));
-    assert.equal(captured.quality,    "medium");
+    assert.equal(captured.quality,    "low");
     assert.equal(captured.size,       "1024x1024");
     assert.equal(captured.background, "opaque");
   });
@@ -116,10 +120,10 @@ describe("generate_image tool", () => {
     let captured;
     const { server, call } = makeServer();
     registerGenerateTool(server, makeOpenAI(async (args) => { captured = args; return { data: [{ b64_json: FAKE_B64 }] }; }));
-    // default context has quality: "medium", size: "1024x1024"
+    // default context has quality: "low", size: "1024x1024"
     const result = await call("generate_image", { prompt: "a harbour", context: "default" });
     writtenFiles.push(parsePath(result));
-    assert.equal(captured.quality, "medium");
+    assert.equal(captured.quality, "low");
     assert.equal(captured.size,    "1024x1024");
   });
 
@@ -217,5 +221,128 @@ describe("generate_image tool", () => {
     const after = outputSnapshot();
     const newFiles = [...after].filter(f => !before.has(f));
     assert.equal(newFiles.length, 0);
+  });
+
+  // -------------------------------------------------------------------------
+  // referenceImages — context-driven routing to images.edit()
+  // -------------------------------------------------------------------------
+
+  test("context without referenceImages uses images.generate()", async () => {
+    let generateCalled = false;
+    const { server, call } = makeServer();
+    registerGenerateTool(server, makeOpenAI(
+      async () => { generateCalled = true; return { data: [{ b64_json: FAKE_B64 }] }; },
+    ));
+    const result = await call("generate_image", { prompt: "a barn", context: "default" });
+    writtenFiles.push(parsePath(result));
+    assert.ok(generateCalled, "expected images.generate() to be called");
+  });
+
+  test("context with referenceImages routes to images.edit(), not images.generate()", async () => {
+    // Write a temp context with one reference image and a temp image file on disk.
+    const contextsDir = path.resolve(__dirname, "../contexts");
+    const refImagePath = path.join(contextsDir, "references", "_test_ref.webp");
+    const refCtxPath   = path.join(contextsDir, "_test_refimages.json");
+
+    fs.writeFileSync(refImagePath, Buffer.from(FAKE_B64, "base64"));
+    fs.writeFileSync(refCtxPath, JSON.stringify({
+      name: "_test_refimages",
+      description: "test ctx with reference images",
+      quality: "low",
+      size: "1024x1024",
+      referenceImages: ["./references/_test_ref.webp"],
+    }));
+    writtenFiles.push(refImagePath, refCtxPath);
+
+    let generateCalled = false;
+    let editCalled     = false;
+    const { server, call } = makeServer();
+    registerGenerateTool(server, makeOpenAI(
+      async () => { generateCalled = true; return { data: [{ b64_json: FAKE_B64 }] }; },
+      async () => { editCalled     = true; return { data: [{ b64_json: FAKE_B64 }] }; },
+    ));
+
+    const result = await call("generate_image", { prompt: "a barn", context: "_test_refimages" });
+    writtenFiles.push(parsePath(result));
+
+    assert.ok(editCalled,       "expected images.edit() to be called");
+    assert.ok(!generateCalled,  "expected images.generate() NOT to be called");
+  });
+
+  test("context with referenceImages passes image files to images.edit()", async () => {
+    const contextsDir = path.resolve(__dirname, "../contexts");
+    const refImagePath = path.join(contextsDir, "references", "_test_ref2.webp");
+    const refCtxPath   = path.join(contextsDir, "_test_refimages2.json");
+
+    fs.writeFileSync(refImagePath, Buffer.from(FAKE_B64, "base64"));
+    fs.writeFileSync(refCtxPath, JSON.stringify({
+      name: "_test_refimages2",
+      description: "test ctx",
+      quality: "low",
+      size: "1024x1024",
+      referenceImages: ["./references/_test_ref2.webp"],
+    }));
+    writtenFiles.push(refImagePath, refCtxPath);
+
+    let capturedEdit;
+    const { server, call } = makeServer();
+    registerGenerateTool(server, makeOpenAI(
+      null,
+      async (args) => { capturedEdit = args; return { data: [{ b64_json: FAKE_B64 }] }; },
+    ));
+
+    const result = await call("generate_image", { prompt: "a barn", context: "_test_refimages2" });
+    writtenFiles.push(parsePath(result));
+
+    assert.ok(capturedEdit, "edit was not called");
+    // image field should be truthy (a single Uploadable or an array)
+    assert.ok(capturedEdit.image, "expected image field in edit call");
+    assert.equal(capturedEdit.prompt.includes("a barn"), true, "prompt should contain user text");
+  });
+
+  test("context with missing referenceImages: response contains error text", async () => {
+    const contextsDir = path.resolve(__dirname, "../contexts");
+    const refCtxPath  = path.join(contextsDir, "_test_missingref.json");
+
+    fs.writeFileSync(refCtxPath, JSON.stringify({
+      name: "_test_missingref",
+      description: "test ctx with missing ref",
+      quality: "low",
+      size: "1024x1024",
+      referenceImages: ["./references/_does_not_exist.webp"],
+    }));
+    writtenFiles.push(refCtxPath);
+
+    const { server, call } = makeServer();
+    registerGenerateTool(server, makeOpenAI());
+
+    const result = await call("generate_image", { prompt: "a barn", context: "_test_missingref" });
+    assert.ok(
+      result.content[0].text.includes("Reference image(s) not found"),
+      `expected error text, got: ${result.content[0].text}`,
+    );
+  });
+
+  test("context with missing referenceImages: no file is written", async () => {
+    const contextsDir = path.resolve(__dirname, "../contexts");
+    const refCtxPath  = path.join(contextsDir, "_test_missingref2.json");
+
+    fs.writeFileSync(refCtxPath, JSON.stringify({
+      name: "_test_missingref2",
+      description: "test ctx",
+      quality: "low",
+      size: "1024x1024",
+      referenceImages: ["./references/_does_not_exist_either.webp"],
+    }));
+    writtenFiles.push(refCtxPath);
+
+    const { server, call } = makeServer();
+    registerGenerateTool(server, makeOpenAI());
+
+    const before = outputSnapshot();
+    await call("generate_image", { prompt: "a barn", context: "_test_missingref2" });
+    const after = outputSnapshot();
+    const newFiles = [...after].filter(f => !before.has(f));
+    assert.equal(newFiles.length, 0, `unexpected new files: ${newFiles.join(", ")}`);
   });
 });

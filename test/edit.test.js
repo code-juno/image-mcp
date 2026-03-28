@@ -230,10 +230,10 @@ describe("edit_image tool", () => {
     let captured;
     const { server, call } = makeServer();
     registerEditTool(server, makeOpenAI(async (args) => { captured = args; return { data: [{ b64_json: FAKE_B64 }] }; }));
-    // default context: quality="medium", size="1024x1024"
+    // default context: quality="low", size="1024x1024"
     const result = await call("edit_image", { prompt: "add fog", image_paths: [tmpPng1], context: "default" });
     writtenFiles.push(parsePath(result));
-    assert.equal(captured.quality, "medium");
+    assert.equal(captured.quality, "low");
     assert.equal(captured.size,    "1024x1024");
   });
 
